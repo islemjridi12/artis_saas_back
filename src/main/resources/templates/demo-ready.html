@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Arial, sans-serif; background: #fff7f0; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background: white;
+            border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #ff7a18, #ff9f43); padding: 32px; text-align: center; }
+        .header h1 { color: white; margin: 0; font-size: 28px; letter-spacing: 1px; }
+        .header p { color: #ffe8d6; margin-top: 8px; font-size: 14px; }
+        .body { padding: 32px; color: #2d2d2d; line-height: 1.6; }
+        .cred-box { background: #fff4eb; border-left: 4px solid #ff7a18;
+            padding: 16px 20px; border-radius: 6px; margin: 24px 0; }
+        .cred-box p { margin: 8px 0; font-size: 15px; }
+        .cred-box strong { color: #e8590c; }
+        .demo-box { background: #fff4eb; border-left: 4px solid #ff9f43;
+            padding: 16px 20px; border-radius: 6px; margin: 24px 0;
+            font-size: 15px; color: #a65c2a; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #ff7a18, #ff9f43);
+            color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none;
+            font-weight: bold; margin: 24px 0; }
+        .footer { background: #fff4eb; padding: 16px; text-align: center;
+            font-size: 12px; color: #a65c2a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>ARTIS</h1>
+        <p>Votre essai gratuit est pret !</p>
+    </div>
+    <div class="body">
+        <p>Bonjour <strong>{{firstName}}</strong>,</p>
+        <p>Votre environnement d essai <strong>{{organizationName}}</strong>
+            a ete cree avec succes.</p>
+
+        <div class="demo-box">
+            ⏳ <strong>Duree de l essai : {{expiresIn}}</strong><br/>
+            Profitez de toutes les fonctionnalites pendant cette periode.
+        </div>
+
+        <div class="cred-box">
+            <p>🌐 <strong>URL de connexion :</strong><br/>
+                <a href="{{loginUrl}}" style="color:#ff7a18;">{{loginUrl}}</a></p>
+            <p>🏢 <strong>Domaine :</strong> {{tenantDomain}}</p>
+            <p>📧 <strong>Email :</strong> {{adminEmail}}</p>
+            <p>🔑 <strong>Mot de passe temporaire :</strong> {{tempPassword}}</p>
+        </div>
+
+        <a href="{{loginUrl}}" class="btn">Acceder a mon essai →</a>
+
+        <p style="color:#999; font-size:13px;">
+            A la fin de votre periode d essai, vos donnees seront conservees
+            pendant 1 mois. Vous pourrez les recuperer en souscrivant a un abonnement.
+        </p>
+    </div>
+    <div class="footer">© 2025 ARTIS SaaS Platform — Tous droits reserves</div>
+</div>
+</body>
+</html>

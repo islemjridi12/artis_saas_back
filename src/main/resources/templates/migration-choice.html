@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Arial, sans-serif; background: #fff7f0; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background: white;
+            border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #ff7a18, #ff9f43); padding: 32px; text-align: center; }
+        .header h1 { color: white; margin: 0; font-size: 28px; }
+        .header p { color: #ffe8d6; margin-top: 8px; font-size: 14px; }
+        .body { padding: 32px; color: #2d2d2d; }
+        .choice-box { border: 2px solid #ff7a18; border-radius: 10px;
+            padding: 24px; margin: 16px 0; cursor: pointer; transition: 0.2s; }
+        .choice-box:hover { background: #fff4eb; }
+        .choice-box h3 { color: #e8590c; margin: 0 0 8px 0; }
+        .choice-box p { margin: 0; color: #555; font-size: 14px; }
+        .btn { display: block; width: 100%; background: linear-gradient(135deg, #ff7a18, #ff9f43);
+            color: white; padding: 14px; border-radius: 6px; text-decoration: none;
+            font-weight: bold; margin-top: 8px; border: none; cursor: pointer;
+            font-size: 15px; text-align: center; }
+        .btn-outline { display: block; width: 100%; background: white;
+            color: #ff7a18; padding: 14px; border-radius: 6px;
+            font-weight: bold; margin-top: 8px; border: 2px solid #ff7a18;
+            cursor: pointer; font-size: 15px; text-align: center; }
+        .footer { background: #fff4eb; padding: 16px; text-align: center;
+            font-size: 12px; color: #a65c2a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>ARTIS</h1>
+        <p>Finaliser votre abonnement</p>
+    </div>
+    <div class="body">
+        <p>Bonjour,</p>
+        <p>Vous etes sur le point de souscrire un abonnement PROD pour
+            <strong>{{organizationName}}</strong>.</p>
+        <p>Que souhaitez-vous faire avec vos donnees de demonstration ?</p>
+
+        <form method="POST" action="/api/payment/migrate-to-prod">
+            <input type="hidden" name="domain" value="{{domain}}"/>
+            <input type="hidden" name="email" value="{{email}}"/>
+
+            <div class="choice-box">
+                <h3>Recuperer mes donnees</h3>
+                <p>Toutes vos donnees de la periode d essai seront
+                    transferees vers votre espace de production.</p>
+                <button type="submit" name="withData" value="true" class="btn">
+                    Oui, migrer mes donnees →
+                </button>
+            </div>
+
+            <div class="choice-box">
+                <h3>Demarrer avec des tables vides</h3>
+                <p>Votre espace de production sera initialise avec un
+                    schema vide. Vos donnees de demo seront supprimees.</p>
+                <button type="submit" name="withData" value="false" class="btn-outline">
+                    Non, demarrer a zero →
+                </button>
+            </div>
+        </form>
+    </div>
+    <div class="footer">© 2025 ARTIS SaaS Platform — Tous droits reserves</div>
+</div>
+</body>
+</html>

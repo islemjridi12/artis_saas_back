@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Arial, sans-serif; background: #fff7f0; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background: white;
+            border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #ff7a18, #ff9f43); padding: 32px; text-align: center; }
+        .header h1 { color: white; margin: 0; font-size: 28px; letter-spacing: 1px; }
+        .header p { color: #ffe8d6; margin-top: 8px; font-size: 14px; }
+        .body { padding: 32px; color: #2d2d2d; line-height: 1.6; }
+        .warning-box { background: #fff4eb; border-left: 4px solid #ff9f43;
+            padding: 16px 20px; border-radius: 6px; margin: 24px 0;
+            font-size: 15px; color: #a65c2a; }
+        .danger-box { background: #fff0e6; border-left: 4px solid #e8590c;
+            padding: 16px 20px; border-radius: 6px; margin: 24px 0;
+            font-size: 14px; color: #d9480f; }
+        .btn { display: inline-block; background: linear-gradient(135deg, #ff7a18, #ff9f43);
+            color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none;
+            font-weight: bold; margin: 24px 0; }
+        .footer { background: #fff4eb; padding: 16px; text-align: center;
+            font-size: 12px; color: #a65c2a; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>ARTIS</h1>
+        <p>Votre periode d essai a expire</p>
+    </div>
+    <div class="body">
+        <p>Bonjour,</p>
+        <p>Votre periode d essai de 2 semaines pour
+            <strong>{{organizationName}}</strong> est terminee.
+            Votre acces a ete suspendu.</p>
+
+        <div class="warning-box">
+            ⏳ Vos donnees sont conservees pendant <strong>1 mois</strong>
+            a compter de la date d expiration.
+            Souscrivez maintenant pour les recuperer sans perte.
+        </div>
+
+        <div class="danger-box">
+            ⚠️ Sans action de votre part, vos donnees seront supprimees
+            definitivement apres ce delai.
+        </div>
+
+        <a href="{{registerUrl}}" class="btn">Souscrire et recuperer mes donnees →</a>
+
+        <p style="color:#999; font-size:13px;">
+            Si vous avez des questions, n hesitez pas a nous contacter.
+        </p>
+    </div>
+    <div class="footer">© 2025 ARTIS SaaS Platform — Tous droits reserves</div>
+</div>
+</body>
+</html>
