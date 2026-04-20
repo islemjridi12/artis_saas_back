@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: provisioning-sensor
+  namespace: argo-events
+spec:
+  dependencies:
+    - name: provisioning-create-dep
+      eventSourceName: rabbitmq-event-source
+      eventName: provisioning-create
+    - name: provisioning-migrate-dep
+      eventSourceName: rabbitmq-event-source
+      eventName: provisioning-migrate
+  triggers:
+    - template:
+        name: provisioning-create-trigger
+        conditions: "provisioning-create-dep"
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: provision-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: provision-tenant
+    - template:
+        name: provisioning-migrate-trigger
+        conditions: "provisioning-migrate-dep"
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: migrate-
+                namespace: argo
+              spec:
+                workflowTemplateRef:
+                  name: migrate-tenant

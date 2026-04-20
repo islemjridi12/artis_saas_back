@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -40,56 +41,9 @@ public class PaymentController {
     @Autowired
     private EmailService emailService;
 
-//    @PostMapping("/init")
-//    public ResponseEntity<Map<String, String>> init(@Valid @RequestBody PaymentInitRequest req) {
-//
-//        // vérifier si une session existe déjà
-//        ProvisioningRequest existing =
-//                provisioningService.findPendingPaymentByDomain(req.getTenantDomain());
-//
-//        if (existing != null && existing.getExpiresAt() != null
-//                && existing.getExpiresAt().isAfter(java.time.LocalDateTime.now())) {
-//            log.info("[PAYMENT] Resume existing session domain={}", req.getTenantDomain());
-//
-//            String paymentUrl = "https://sandbox.paymee.tn/gateway/" + existing.getPaymentToken();
-//
-//
-//            return ResponseEntity.ok(Map.of(
-//                    "paymentUrl", paymentUrl,
-//                    "token", existing.getPaymentToken()
-//            ));
-//        }
-//
-//        //  créer nouvelle demande
-//        ProvisioningRequest pr = provisioningService.createInitialRequest(req);
-//        if (!pr.isEmailVerified()) {
-//            return ResponseEntity.status(403).body(
-//                    Map.of("message", "Email non vérifié")
-//            );
-//        }
-//
-//        pr.setExpiresAt(java.time.LocalDateTime.now().plusHours(1)); //  IMPORTANT
-//
-//        //  appel Paymee
-//        Map<String, Object> res = paymeeService.createPayment(req);
-//        validatePaymeeResponse(res);
-//
-//        Map<String, Object> data = (Map<String, Object>) res.get("data");
-//
-//        String paymentUrl = data.get("payment_url").toString();
-//        String paymeeToken = data.get("token").toString();
-//
-//        //  sauvegarder token + expiration
-//        pr.setPaymentToken(paymeeToken);
-//        provisioningService.save(pr);
-//
-//        log.info("[PAYMENT] Init success domain={} token={}", pr.getTenantDomain(), paymeeToken);
-//
-//        return ResponseEntity.ok(Map.of(
-//                "paymentUrl", paymentUrl,
-//                "token", paymeeToken
-//        ));
-//    }
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
 @PostMapping("/init")
 public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
 
@@ -180,15 +134,27 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
         return ResponseEntity.ok("OK");
     }
 
+//    @GetMapping("/redirect-success")
+//    public void redirectSuccess(HttpServletResponse response) throws IOException {
+//        response.setHeader("ngrok-skip-browser-warning", "true");
+//        response.sendRedirect("http://localhost:4200/payment/success");
+//    }
+//
+//    @GetMapping("/redirect-cancel")
+//    public void redirectCancel(HttpServletResponse response) throws IOException {
+//        response.sendRedirect("http://localhost:4200/payment/cancel");
+//    }
+
     @GetMapping("/redirect-success")
     public void redirectSuccess(HttpServletResponse response) throws IOException {
         response.setHeader("ngrok-skip-browser-warning", "true");
-        response.sendRedirect("http://localhost:4200/payment/success");
+        response.sendRedirect(frontendUrl + "/payment/success");
     }
 
+    // 🔥 MODIFIER redirectCancel
     @GetMapping("/redirect-cancel")
     public void redirectCancel(HttpServletResponse response) throws IOException {
-        response.sendRedirect("http://localhost:4200/payment/cancel");
+        response.sendRedirect(frontendUrl + "/payment/cancel");
     }
 
     @SuppressWarnings("unchecked")

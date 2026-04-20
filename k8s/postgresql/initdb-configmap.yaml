@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-initdb
+  namespace: artis
+data:
+  init.sql: |
+    CREATE DATABASE "saasPlatform";
+    CREATE DATABASE artisdb;
+    CREATE DATABASE artisdb_demo;
+    CREATE DATABASE keycloak;

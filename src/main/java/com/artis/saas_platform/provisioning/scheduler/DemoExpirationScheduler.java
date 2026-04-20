@@ -3,6 +3,8 @@ package com.artis.saas_platform.provisioning.scheduler;
 import com.artis.saas_platform.common.Email.EmailService;
 import com.artis.saas_platform.keycloak.service.KeycloakProvisioner;
 import com.artis.saas_platform.provisioning.entity.AccountType;
+import com.artis.saas_platform.provisioning.publisher.ProvisioningEventPublisher;
+import com.artis.saas_platform.provisioning.repository.ProvisioningRequestRepository;
 import com.artis.saas_platform.provisioning.service.SchemaProvisioningService;
 import com.artis.saas_platform.tenancy.entity.Tenant;
 import com.artis.saas_platform.tenancy.repository.TenantRepository;
@@ -11,8 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import java.time.LocalDateTime;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -25,9 +27,10 @@ public class DemoExpirationScheduler {
     private final SchemaProvisioningService schemaProvisioningService;
     private final KeycloakProvisioner keycloakProvisioner;
     private final Keycloak keycloak;
+    private final ProvisioningEventPublisher publisher;
+    private final ProvisioningRequestRepository provisioningRepository;
 
-//    @Scheduled(fixedDelay = 3600000)
-@Scheduled(fixedDelay = 10000)
+    @Scheduled(fixedDelay = 10000)
     public void checkDemoExpiration() {
 
         // ===== PARTIE 1 : suspendre les demos expirees =====
@@ -42,6 +45,11 @@ public class DemoExpirationScheduler {
             tenant.setUpdatedAt(LocalDateTime.now());
             tenantRepository.save(tenant);
 
+            // 🔥 Publier event expire sur RabbitMQ
+            provisioningRepository.findByTenantDomain(tenant.getTenantDomain())
+                    .ifPresent(pr -> publisher.publishExpire(pr));
+
+            // Email demo-expired
             emailService.sendDemoExpiredEmail(
                     tenant.getAdminEmail(),
                     tenant.getOrganizationName(),
@@ -60,15 +68,12 @@ public class DemoExpirationScheduler {
 
         for (Tenant tenant : toDelete) {
             try {
-                // 1️⃣ Supprimer le schema demo
                 schemaProvisioningService.dropDemoSchema(tenant.getSchemaName());
 
-                // 2️⃣ Supprimer le realm Keycloak
                 if (keycloakProvisioner.realmExists(tenant.getRealm())) {
                     keycloak.realm(tenant.getRealm()).remove();
                 }
 
-                // 3️⃣ Supprimer le tenant en base
                 tenantRepository.delete(tenant);
 
                 log.info("[DEMO] Deleted after 1 month → domain={}", tenant.getTenantDomain());
@@ -79,6 +84,4 @@ public class DemoExpirationScheduler {
             }
         }
     }
-
-
 }

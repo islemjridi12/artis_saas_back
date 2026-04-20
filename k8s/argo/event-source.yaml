@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: rabbitmq-event-source
+  namespace: argo-events
+spec:
+  rabbitmq:
+    provisioning-create:
+      url: amqp://guest:guest@rabbitmq.artis.svc.cluster.local:5672
+      exchangeName: provisioning.exchange
+      exchangeType: topic
+      routingKey: provisioning.create
+      queueName: provisioning.create
+      durable: true
+      autoDelete: false
+      jsonBody: true

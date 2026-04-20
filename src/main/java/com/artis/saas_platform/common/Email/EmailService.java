@@ -4,6 +4,7 @@ import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -20,11 +21,16 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    // ✅ EXISTANT — ne pas toucher
+    //  AJOUTER ces deux champs
+    @Value("${app.platform.url}")
+    private String platformUrl;
+
+    @Value("${app.metier.url}")
+    private String metierUrl;
+
     public void sendVerificationEmail(String to, String code) {
         String html = loadTemplate("otp-verification.html")
                 .replace("{{code}}", code);
-
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -38,23 +44,20 @@ public class EmailService {
         }
     }
 
-    // 🔥 NOUVEAU — email HTML après provisioning
     public void sendTenantReadyEmail(
-            String to,
-            String firstName,
-            String organizationName,
-            String tenantDomain,
-            String tempPassword) {
+            String to, String firstName, String organizationName,
+            String tenantDomain, String tempPassword) {
 
-        String appUrl = "https://" + tenantDomain + ".artis.com";
-        String loginUrl = "http://localhost:4201/signin";
+        // 🔥 Utiliser metierUrl au lieu de localhost
+        String loginUrl = metierUrl + "/signin";
 
-        String passwordText = (tempPassword == null || tempPassword.equals("**CLEARED**"))
+        String passwordText = (tempPassword == null
+                || tempPassword.equals("**CLEARED**"))
                 ? "Votre mot de passe reste inchange"
                 : tempPassword;
 
         String html = loadTemplate("tenant-ready.html")
-                .replace("{{firstName}}",        firstName)
+                .replace("{{firstName}}",        firstName != null ? firstName : "")
                 .replace("{{organizationName}}", organizationName)
                 .replace("{{loginUrl}}",         loginUrl)
                 .replace("{{tenantDomain}}",     tenantDomain)
@@ -65,7 +68,7 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setTo(to);
-            helper.setSubject("🎉 Votre espace " + organizationName + " est prêt !");
+            helper.setSubject("Votre espace " + organizationName + " est pret !");
             helper.setText(html, true);
             mailSender.send(message);
             log.info("[EMAIL] Tenant ready sent → {}", to);
@@ -74,24 +77,10 @@ public class EmailService {
         }
     }
 
-    // 🔥 NOUVEAU — chargement template HTML
-    public String loadTemplate(String filename) {
-        try {
-            ClassPathResource resource =
-                    new ClassPathResource("templates/" + filename);
-            return new String(
-                    resource.getInputStream().readAllBytes(),
-                    StandardCharsets.UTF_8
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Template not found: " + filename, e);
-        }
-    }
-
     public void sendDemoExpiredEmail(String to, String orgName, String domain) {
 
-        // 🔥 URL vers page de choix migration
-        String migrateUrl = "http://localhost:8081/api/payment/migrate-to-prod"
+        // 🔥 Utiliser platformUrl au lieu de localhost
+        String migrateUrl = platformUrl + "/api/payment/migrate-to-prod"
                 + "?domain=" + domain
                 + "&email=" + to;
 
@@ -114,13 +103,11 @@ public class EmailService {
     }
 
     public void sendDemoReadyEmail(
-            String to,
-            String firstName,
-            String organizationName,
-            String tenantDomain,
-            String tempPassword) {
+            String to, String firstName, String organizationName,
+            String tenantDomain, String tempPassword) {
 
-        String loginUrl = "http://localhost:4201/signin";
+        // 🔥 Utiliser metierUrl au lieu de localhost
+        String loginUrl = metierUrl + "/signin";
 
         String html = loadTemplate("demo-ready.html")
                 .replace("{{firstName}}",        firstName)
@@ -141,6 +128,19 @@ public class EmailService {
             log.info("[EMAIL] Demo ready sent → {}", to);
         } catch (Exception e) {
             log.error("[EMAIL] Failed demo ready → {} error={}", to, e.getMessage());
+        }
+    }
+
+    public String loadTemplate(String filename) {
+        try {
+            ClassPathResource resource =
+                    new ClassPathResource("templates/" + filename);
+            return new String(
+                    resource.getInputStream().readAllBytes(),
+                    StandardCharsets.UTF_8
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Template not found: " + filename, e);
         }
     }
 }

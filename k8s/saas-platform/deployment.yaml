@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saas-platform
+  namespace: artis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: saas-platform
+  template:
+    metadata:
+      labels:
+        app: saas-platform
+    spec:
+      containers:
+        - name: saas-platform
+          image: artis/saas-platform:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: saas-platform-config
