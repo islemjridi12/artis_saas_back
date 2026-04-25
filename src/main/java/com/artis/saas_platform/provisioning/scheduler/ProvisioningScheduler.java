@@ -34,16 +34,19 @@ public class ProvisioningScheduler {
 
         for (ProvisioningRequest pr : requests) {
             try {
-                log.info("Publishing domain={} type={} migration={}",
-                        pr.getTenantDomain(), pr.getAccountType(), pr.isMigrationPending());
 
+                log.info("Publishing domain={} type={} migration={}",
+                        pr.getTenantDomain(),
+                        pr.getAccountType(),
+                        pr.isMigrationPending());
+
+                // ─── Branche selon le contexte ───
                 if (pr.isMigrationPending()) {
                     publisher.publishMigrate(pr);
                 } else {
                     publisher.publishCreate(pr);
                 }
 
-                // Marquer comme IN_PROGRESS pour eviter double traitement
                 pr.setStatus(ProvisioningStatus.IN_PROGRESS);
                 pr.setUpdatedAt(LocalDateTime.now());
                 repository.save(pr);

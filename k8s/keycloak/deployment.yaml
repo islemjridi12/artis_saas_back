@@ -15,13 +15,15 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:23.0
+          image: quay.io/keycloak/keycloak:26.0
           args: ["start-dev"]
           env:
-            - name: KEYCLOAK_ADMIN
+            # ─── Nouveaux noms de variables en Keycloak 26 ───
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: admin
-            - name: KEYCLOAK_ADMIN_PASSWORD
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
               value: admin
+            # ─── DB config ───
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL

@@ -10,6 +10,7 @@ import com.artis.saas_platform.keycloak.service.KeycloakProvisioner;
 import com.artis.saas_platform.payment.dto.PaymentInitRequest;
 import com.artis.saas_platform.provisioning.entity.AccountType;
 import com.artis.saas_platform.provisioning.entity.ProvisioningRequest;
+import com.artis.saas_platform.provisioning.publisher.ProvisioningEventPublisher;
 import com.artis.saas_platform.provisioning.repository.ProvisioningRequestRepository;
 import com.artis.saas_platform.provisioning.service.MigrationService;
 import com.artis.saas_platform.provisioning.service.SchemaProvisioningService;
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -34,14 +36,22 @@ import java.util.UUID;
 public class ProvisioningServiceImpl implements ProvisioningService {
 
     private static final Logger log = LoggerFactory.getLogger(ProvisioningServiceImpl.class);
-
-    private final ProvisioningRequestRepository repository;
-    private final TenantRepository tenantRepository;
-    private final SubscriptionRepository subscriptionRepository;
-    private final KeycloakProvisioner keycloakProvisioner;
-    private final SchemaProvisioningService schemaProvisioningService;
-    private final EmailService emailService;
-    private final MigrationService migrationService;
+    @Autowired
+    private  ProvisioningRequestRepository repository;
+    @Autowired
+    private  TenantRepository tenantRepository;
+    @Autowired
+    private  SubscriptionRepository subscriptionRepository;
+    @Autowired
+    private  KeycloakProvisioner keycloakProvisioner;
+    @Autowired
+    private  SchemaProvisioningService schemaProvisioningService;
+    @Autowired
+    private  EmailService emailService;
+    @Autowired
+    private  MigrationService migrationService;
+    @Autowired
+    private ProvisioningEventPublisher publisher;
 
     @Override
     public ProvisioningRequest createInitialRequest(PaymentInitRequest req) {
@@ -119,20 +129,21 @@ public class ProvisioningServiceImpl implements ProvisioningService {
     }
 
     @Override
-    public void markPaymentSuccess(String paymentToken) {
+    public ProvisioningRequest markPaymentSuccess(String paymentToken) {
         ProvisioningRequest pr = repository.findByPaymentToken(paymentToken).orElseThrow();
         if (pr.isMigrationPending()) {
             pr.setStatus(ProvisioningStatus.PENDING);
             pr.setUpdatedAt(LocalDateTime.now());
             repository.save(pr);
-            return;
+            return pr;
         }
         if (pr.getStatus() == ProvisioningStatus.COMPLETED || pr.getStatus() == ProvisioningStatus.IN_PROGRESS) {
-            return;
+            return pr;
         }
         pr.setStatus(ProvisioningStatus.PENDING);
         pr.setUpdatedAt(LocalDateTime.now());
         repository.save(pr);
+        return pr;
     }
 
     @Override
@@ -462,5 +473,10 @@ public class ProvisioningServiceImpl implements ProvisioningService {
 
         // 2. Retrouver la ProvisioningRequest correspondante
         return repository.findByTenantDomain(domain).orElse(null);
+    }
+
+    @Override
+    public void triggerMigration(ProvisioningRequest pr) {
+        publisher.publishMigrate(pr);
     }
 }

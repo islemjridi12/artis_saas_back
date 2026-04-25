@@ -1,0 +1,16 @@
+# NOTE : L'EventBus "default" existe DEJA dans argo-events (stan-0/1/2 running).
+# Ce fichier est fourni pour reference, mais tu n'as PAS besoin de l'appliquer.
+# Si tu veux verifier : kubectl get eventbus -n argo-events
+#
+# Applique UNIQUEMENT si l'EventBus n'existe pas.
+
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  nats:
+    native:
+      replicas: 3
+      auth: none

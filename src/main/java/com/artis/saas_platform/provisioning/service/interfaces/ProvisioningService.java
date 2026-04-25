@@ -11,7 +11,7 @@ public interface ProvisioningService {
     ProvisioningRequest createInitialRequest(PaymentInitRequest req);
     ProvisioningRequest createDemoRequest(PaymentInitRequest req);
     void process(UUID requestId);
-    void markPaymentSuccess(String paymentToken);
+    ProvisioningRequest markPaymentSuccess(String paymentToken);
     void markPaymentFailure(String paymentToken);
     void attachPaymentToken(UUID id, String token);
     void save(ProvisioningRequest pr);
@@ -21,4 +21,5 @@ public interface ProvisioningService {
     ProvisioningRequest findByOtpToken(String token);
     ProvisioningRequest findByAdminEmail(String email);
     ProvisioningRequest findByDomainAndDemoSuspended(String domain);
+    void triggerMigration(ProvisioningRequest pr);
 }

@@ -56,4 +56,6 @@ public class Tenant {
 
     @Column
     private boolean suspended = false;
+
+    private LocalDateTime suspendedAt;
 }

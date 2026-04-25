@@ -22,8 +22,8 @@ public class EmailService {
     private JavaMailSender mailSender;
 
     //  AJOUTER ces deux champs
-    @Value("${app.platform.url}")
-    private String platformUrl;
+    @Value("${app.frontend.url}")    // ← changer ici
+    private String frontendUrl;       // ← renommer aussi
 
     @Value("${app.metier.url}")
     private String metierUrl;
@@ -80,7 +80,7 @@ public class EmailService {
     public void sendDemoExpiredEmail(String to, String orgName, String domain) {
 
         // 🔥 Utiliser platformUrl au lieu de localhost
-        String migrateUrl = platformUrl + "/api/payment/migrate-to-prod"
+        String migrateUrl = frontendUrl + "/migrate"
                 + "?domain=" + domain
                 + "&email=" + to;
 

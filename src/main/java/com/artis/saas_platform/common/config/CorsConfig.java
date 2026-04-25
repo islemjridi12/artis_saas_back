@@ -13,7 +13,8 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedOrigins(
                         "http://localhost:4200",   // ARTIS Platform frontend
                         "http://localhost:4201",   // ARTIS Métier frontend
-                        "http://localhost:55639"   // ARTIS Métier frontend (port dynamique)
+                        "http://localhost:55639",   // ARTIS Métier frontend (port dynamique)
+                        "http://localhost:8080"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")

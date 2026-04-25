@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -115,6 +116,7 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
             }
     )
     public ResponseEntity<String> webhook(@RequestParam Map<String, String> payload) {
+
         log.info("[WEBHOOK] Received {}", payload);
 
         String token = payload.get("token");
@@ -130,7 +132,9 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
             return ResponseEntity.ok("Payment failed");
         }
 
-        provisioningService.markPaymentSuccess(token);
+        // ✅ récupérer le provisioningRequest
+        ProvisioningRequest pr = provisioningService.markPaymentSuccess(token);
+
         return ResponseEntity.ok("OK");
     }
 
@@ -309,23 +313,24 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
     @GetMapping(value = "/migrate-to-prod", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> showMigrationChoice(
             @RequestParam String domain,
-            @RequestParam String email) {
+            @RequestParam(required = false) String email) {
 
-        // Verifier via provisioningService
         ProvisioningRequest demo = provisioningService.findByDomainAndDemoSuspended(domain);
 
         if (demo == null) {
-            return ResponseEntity.status(404).body("Demo non trouvee ou non expiree");
+            return ResponseEntity.status(404).body("Demo non trouvée ou non expirée");
         }
 
-        if (!demo.getAdminEmail().equals(email)) {
-            return ResponseEntity.status(403).body("Acces refuse");
+        String finalEmail = demo.getAdminEmail();
+
+        if (email != null && !email.equals(finalEmail)) {
+            return ResponseEntity.status(403).body("Accès refusé");
         }
 
         String html = emailService.loadTemplate("migration-choice.html")
                 .replace("{{organizationName}}", demo.getOrganizationName())
                 .replace("{{domain}}", domain)
-                .replace("{{email}}", email);
+                .replace("{{email}}", finalEmail);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_HTML)
@@ -335,30 +340,24 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
     @PostMapping("/migrate-to-prod")
     public ResponseEntity<?> processMigrationChoice(
             @RequestParam String domain,
-            @RequestParam String email,
             @RequestParam boolean withData) {
 
         ProvisioningRequest demo = provisioningService.findByDomainAndDemoSuspended(domain);
 
         if (demo == null) {
-            return ResponseEntity.status(404).body("Demo non trouvee");
+            return ResponseEntity.status(404).body("Demo non trouvée");
         }
 
-        if (!demo.getAdminEmail().equals(email)) {
-            return ResponseEntity.status(403).body("Acces refuse");
-        }
-
-        // Sauvegarder le choix
         demo.setMigrationPending(true);
         demo.setWithData(withData);
         provisioningService.save(demo);
 
-        // Generer lien Paymee
         PaymentInitRequest req = buildRequestFromPr(demo);
         Map<String, Object> res = paymeeService.createPayment(req);
         validatePaymeeResponse(res);
 
         Map<String, Object> data = (Map<String, Object>) res.get("data");
+
         String paymeeUrl = data.get("payment_url").toString();
         String token = data.get("token").toString();
 
@@ -366,8 +365,6 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
         demo.setExpiresAt(LocalDateTime.now().plusHours(1));
         provisioningService.save(demo);
 
-        return ResponseEntity.status(302)
-                .header("Location", paymeeUrl)
-                .build();
+        return ResponseEntity.ok(Map.of("redirectUrl", paymeeUrl));
     }
 }

@@ -4,19 +4,30 @@ metadata:
   name: provisioning-sensor
   namespace: argo-events
 spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+
   dependencies:
-    - name: provisioning-create-dep
-      eventSourceName: rabbitmq-event-source
-      eventName: provisioning-create
-    - name: provisioning-migrate-dep
-      eventSourceName: rabbitmq-event-source
-      eventName: provisioning-migrate
+    - name: create-dep
+      eventSourceName: provisioning-amqp
+      eventName: create
+    - name: migrate-dep
+      eventSourceName: provisioning-amqp
+      eventName: migrate
+    - name: expire-dep
+      eventSourceName: provisioning-amqp
+      eventName: expire
+
   triggers:
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Trigger 1 : PROVISION (nouveau tenant DEMO ou PROD)
+    # ═══════════════════════════════════════════════════════════════════════
     - template:
-        name: provisioning-create-trigger
-        conditions: "provisioning-create-dep"
-        argoWorkflow:
-          operation: submit
+        name: provision-trigger
+        conditions: "create-dep"
+        k8s:
+          operation: create
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -25,13 +36,137 @@ spec:
                 generateName: provision-
                 namespace: argo
               spec:
-                workflowTemplateRef:
-                  name: provision-tenant
+                entrypoint: pipeline
+                serviceAccountName: argo
+                onExit: cleanup-dev-schema
+                arguments:
+                  parameters:
+                    - name: tenantDomain
+                      value: "PLACEHOLDER"
+                    - name: schemaName
+                      value: "PLACEHOLDER"
+                    - name: databaseName
+                      value: "PLACEHOLDER"
+                    - name: devSchema
+                      value: "PLACEHOLDER"
+                    - name: requestId
+                      value: "PLACEHOLDER"
+                volumes:
+                  - name: atlas-migrations
+                    hostPath:
+                      path: /mnt/atlas-migrations
+                      type: Directory
+
+                templates:
+                  - name: pipeline
+                    steps:
+                      - - name: create-schema
+                          template: create-schema
+                      - - name: create-dev-schema
+                          template: create-dev-schema
+                      - - name: atlas-schema
+                          template: atlas-schema
+                      - - name: notify
+                          template: notify
+
+                  - name: create-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "CREATE SCHEMA IF NOT EXISTS {{workflow.parameters.schemaName}};"
+
+                  - name: create-dev-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE; CREATE SCHEMA {{workflow.parameters.devSchema}};"
+
+                  - name: atlas-schema
+                    container:
+                      image: arigaio/atlas:latest
+                      command: ["/atlas"]
+                      args:
+                        - schema
+                        - apply
+                        - --url
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.schemaName}}&sslmode=disable"
+                        - --dev-url
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
+                        - --to
+                        - "file:///migrations/schema.sql"
+                        - --auto-approve
+                      volumeMounts:
+                        - name: atlas-migrations
+                          mountPath: /migrations
+                          readOnly: true
+
+                  - name: cleanup-dev-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE;"
+
+                  - name: notify
+                    container:
+                      image: curlimages/curl:latest
+                      command: [sh, -c]
+                      env:
+                        - name: INTERNAL_SECRET
+                          valueFrom:
+                            secretKeyRef:
+                              name: internal-api-secret
+                              key: secret
+                      args:
+                        - |
+                          curl -s -X POST http://saas-platform.artis.svc.cluster.local:8081/api/internal/provisioning/complete \
+                            -H "Content-Type: application/json" \
+                            -H "X-Internal-Secret: $INTERNAL_SECRET" \
+                            -d "{\"requestId\":\"{{workflow.parameters.requestId}}\",\"domain\":\"{{workflow.parameters.tenantDomain}}\",\"status\":\"SUCCESS\"}"
+
+          parameters:
+            - src:
+                dependencyName: create-dep
+                dataKey: body.tenantDomain
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: create-dep
+                dataKey: body.schemaName
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: create-dep
+                dataKey: body.databaseName
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: create-dep
+                dataKey: body.devSchema
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: create-dep
+                dataKey: body.requestId
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: create-dep
+                dataKey: body.tenantDomain
+              dest: metadata.generateName
+              operation: append
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Trigger 2 : MIGRATE (DEMO -> PROD avec/sans donnees)
+    # ═══════════════════════════════════════════════════════════════════════
     - template:
-        name: provisioning-migrate-trigger
-        conditions: "provisioning-migrate-dep"
-        argoWorkflow:
-          operation: submit
+        name: migrate-trigger
+        conditions: "migrate-dep"
+        k8s:
+          operation: create
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -40,5 +175,287 @@ spec:
                 generateName: migrate-
                 namespace: argo
               spec:
-                workflowTemplateRef:
-                  name: migrate-tenant
+                entrypoint: pipeline
+                serviceAccountName: argo
+                onExit: cleanup-dev-schema
+                arguments:
+                  parameters:
+                    - name: tenantDomain
+                      value: "PLACEHOLDER"
+                    - name: prodSchemaName     # tenant_xxx (cible)
+                      value: "PLACEHOLDER"
+                    - name: demoSchemaName     # demo_xxx (source)
+                      value: "PLACEHOLDER"
+                    - name: databaseName        # artisdb (cible PROD)
+                      value: "PLACEHOLDER"
+                    - name: demoDatabaseName    # artisdb_demo (source)
+                      value: "PLACEHOLDER"
+                    - name: devSchema
+                      value: "PLACEHOLDER"
+                    - name: requestId
+                      value: "PLACEHOLDER"
+                    - name: withData            # "true" ou "false" (string)
+                      value: "false"
+                volumes:
+                  - name: atlas-migrations
+                    hostPath:
+                      path: /mnt/atlas-migrations
+                      type: Directory
+
+                templates:
+                  # ─── Pipeline principal ───
+                  # Note : copy-data depend de withData.
+                  # Si withData=true : on copie les donnees demo -> prod
+                  # Si withData=false : on saute cette etape
+                  - name: pipeline
+                    steps:
+                      - - name: create-prod-schema
+                          template: create-prod-schema
+                      - - name: create-dev-schema
+                          template: create-dev-schema
+                      - - name: atlas-schema
+                          template: atlas-schema
+                      - - name: copy-data
+                          template: copy-data
+                          when: "{{workflow.parameters.withData}} == true"
+                      - - name: drop-demo-schema
+                          template: drop-demo-schema
+                      - - name: notify
+                          template: notify
+
+                  # ─── Step 1 : creer le schema PROD ───
+                  - name: create-prod-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "CREATE SCHEMA IF NOT EXISTS {{workflow.parameters.prodSchemaName}};"
+
+                  # ─── Step 2 : schema dev jetable pour Atlas ───
+                  - name: create-dev-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE; CREATE SCHEMA {{workflow.parameters.devSchema}};"
+
+                  # ─── Step 3 : Atlas cree les tables dans PROD ───
+                  - name: atlas-schema
+                    container:
+                      image: arigaio/atlas:latest
+                      command: ["/atlas"]
+                      args:
+                        - schema
+                        - apply
+                        - --url
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.prodSchemaName}}&sslmode=disable"
+                        - --dev-url
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
+                        - --to
+                        - "file:///migrations/schema.sql"
+                        - --auto-approve
+                      volumeMounts:
+                        - name: atlas-migrations
+                          mountPath: /migrations
+                          readOnly: true
+
+                  # ─── Step 4 : copier les donnees demo -> prod (si withData=true) ───
+                  # Utilise dblink pour copier entre DIFFERENTES bases (artisdb_demo -> artisdb).
+                  # Lit dynamiquement toutes les tables via information_schema.
+                  - name: copy-data
+                    container:
+                      image: postgres:15-alpine
+                      command: [sh, -c]
+                      env:
+                        - name: PGPASSWORD
+                          value: postgres
+                      args:
+                        - |
+                          set -e
+                          echo "[COPY] Starting data copy from {{workflow.parameters.demoSchemaName}} (db={{workflow.parameters.demoDatabaseName}}) to {{workflow.parameters.prodSchemaName}} (db={{workflow.parameters.databaseName}})"
+
+                          # Installer dblink dans la DB prod (si pas deja fait)
+                          psql -h postgresql.artis.svc.cluster.local -U postgres -d {{workflow.parameters.databaseName}} \
+                            -c "CREATE EXTENSION IF NOT EXISTS dblink;"
+
+                          # Boucler sur toutes les tables du schema source et copier
+                          psql -h postgresql.artis.svc.cluster.local -U postgres -d {{workflow.parameters.databaseName}} <<SQL
+                          DO \$\$
+                          DECLARE
+                              rec RECORD;
+                              cols TEXT;
+                              sql_stmt TEXT;
+                          BEGIN
+                              FOR rec IN
+                                  SELECT table_name
+                                  FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
+                                              'SELECT table_name FROM information_schema.tables WHERE table_schema = ''{{workflow.parameters.demoSchemaName}}'' AND table_type = ''BASE TABLE''')
+                                  AS t(table_name TEXT)
+                              LOOP
+                                  -- Recuperer les colonnes de la table (sauf les id IDENTITY)
+                                  SELECT string_agg(quote_ident(column_name), ', ')
+                                  INTO cols
+                                  FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
+                                              format('SELECT column_name FROM information_schema.columns WHERE table_schema = %L AND table_name = %L ORDER BY ordinal_position', '{{workflow.parameters.demoSchemaName}}', rec.table_name))
+                                  AS c(column_name TEXT);
+
+                                  -- INSERT ... SELECT via dblink
+                                  sql_stmt := format(
+                                      'INSERT INTO {{workflow.parameters.prodSchemaName}}.%I (%s) SELECT %s FROM dblink(%L, %L) AS src(%s)',
+                                      rec.table_name,
+                                      cols,
+                                      cols,
+                                      'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
+                                      format('SELECT %s FROM %I.%I', cols, '{{workflow.parameters.demoSchemaName}}', rec.table_name),
+                                      (SELECT string_agg(quote_ident(column_name) || ' ' || data_type, ', ')
+                                       FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
+                                                   format('SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = %L AND table_name = %L ORDER BY ordinal_position', '{{workflow.parameters.demoSchemaName}}', rec.table_name))
+                                       AS c(column_name TEXT, data_type TEXT))
+                                  );
+
+                                  RAISE NOTICE 'Copying table: %', rec.table_name;
+                                  EXECUTE sql_stmt;
+                              END LOOP;
+                          END \$\$;
+                          SQL
+
+                          echo "[COPY] Data copy completed"
+
+                  # ─── Step 5 : DROP schema demo ───
+                  - name: drop-demo-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.demoDatabaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.demoSchemaName}} CASCADE;"
+
+                  # ─── onExit : cleanup dev schema ───
+                  - name: cleanup-dev-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE;"
+
+                  # ─── Step 6 : notify saas-platform ───
+                  - name: notify
+                    container:
+                      image: curlimages/curl:latest
+                      command: [sh, -c]
+                      env:
+                        - name: INTERNAL_SECRET
+                          valueFrom:
+                            secretKeyRef:
+                              name: internal-api-secret
+                              key: secret
+                      args:
+                        - |
+                          curl -s -X POST http://saas-platform.artis.svc.cluster.local:8081/api/internal/provisioning/complete \
+                            -H "Content-Type: application/json" \
+                            -H "X-Internal-Secret: $INTERNAL_SECRET" \
+                            -d "{\"requestId\":\"{{workflow.parameters.requestId}}\",\"domain\":\"{{workflow.parameters.tenantDomain}}\",\"status\":\"MIGRATED\"}"
+
+          parameters:
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.tenantDomain
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.prodSchemaName
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.demoSchemaName
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.databaseName
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.demoDatabaseName
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.devSchema
+              dest: spec.arguments.parameters.5.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.requestId
+              dest: spec.arguments.parameters.6.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.withData
+              dest: spec.arguments.parameters.7.value
+            - src:
+                dependencyName: migrate-dep
+                dataKey: body.tenantDomain
+              dest: metadata.generateName
+              operation: append
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Trigger 3 : EXPIRE (30 jours apres suspension, nettoyage definitif)
+    # ═══════════════════════════════════════════════════════════════════════
+    - template:
+        name: expire-trigger
+        conditions: "expire-dep"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: expire-
+                namespace: argo
+              spec:
+                entrypoint: pipeline
+                serviceAccountName: argo
+                arguments:
+                  parameters:
+                    - name: tenantDomain
+                      value: "PLACEHOLDER"
+                    - name: schemaName
+                      value: "PLACEHOLDER"
+                    - name: databaseName
+                      value: "PLACEHOLDER"
+                templates:
+                  - name: pipeline
+                    steps:
+                      - - name: drop-schema
+                          template: drop-schema
+                  - name: drop-schema
+                    container:
+                      image: postgres:15-alpine
+                      command: [psql]
+                      args:
+                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "-c"
+                        - "DROP SCHEMA IF EXISTS {{workflow.parameters.schemaName}} CASCADE;"
+          parameters:
+            - src:
+                dependencyName: expire-dep
+                dataKey: body.tenantDomain
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: expire-dep
+                dataKey: body.schemaName
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: expire-dep
+                dataKey: body.databaseName
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: expire-dep
+                dataKey: body.tenantDomain
+              dest: metadata.generateName
+              operation: append

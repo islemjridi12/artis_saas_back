@@ -1,16 +1,112 @@
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
-  name: rabbitmq-event-source
-  namespace: argo-events
+  name: provisioning-amqp
+  namespace: argo-events           # EventSource dans argo-events
 spec:
-  rabbitmq:
-    provisioning-create:
-      url: amqp://guest:guest@rabbitmq.artis.svc.cluster.local:5672
+  amqp:
+
+    # ─────────────────────────────────────────────────────────────
+    # Source 1 : provisioning.create
+    # ─────────────────────────────────────────────────────────────
+    create:
+      # RabbitMQ tourne dans le namespace "artis"
+      url: amqp://rabbitmq.artis.svc.cluster.local:5672
+      jsonBody: true
       exchangeName: provisioning.exchange
       exchangeType: topic
       routingKey: provisioning.create
-      queueName: provisioning.create
-      durable: true
-      autoDelete: false
+      exchangeDeclare:
+        durable: true
+        autoDelete: false
+      queueDeclare:
+        name: "provisioning.create"
+        durable: true
+        autoDelete: false
+        exclusive: false
+      queueBind:
+        noWait: false
+      consume:
+        consumerTag: "argo-events-create"
+        autoAck: false
+        exclusive: false
+      auth:
+        username:
+          name: rabbitmq-credentials
+          key: username
+        password:
+          name: rabbitmq-credentials
+          key: password
+
+    # ─────────────────────────────────────────────────────────────
+    # Source 2 : provisioning.migrate
+    # ─────────────────────────────────────────────────────────────
+    migrate:
+      url: amqp://rabbitmq.artis.svc.cluster.local:5672
       jsonBody: true
+      exchangeName: provisioning.exchange
+      exchangeType: topic
+      routingKey: provisioning.migrate
+      exchangeDeclare:
+        durable: true
+        autoDelete: false
+      queueDeclare:
+        name: "provisioning.migrate"
+        durable: true
+        autoDelete: false
+        exclusive: false
+      queueBind:
+        noWait: false
+      consume:
+        consumerTag: "argo-events-migrate"
+        autoAck: false
+        exclusive: false
+      auth:
+        username:
+          name: rabbitmq-credentials
+          key: username
+        password:
+          name: rabbitmq-credentials
+          key: password
+
+    # ─────────────────────────────────────────────────────────────
+    # Source 3 : provisioning.expire
+    # ─────────────────────────────────────────────────────────────
+    expire:
+      url: amqp://rabbitmq.artis.svc.cluster.local:5672
+      jsonBody: true
+      exchangeName: provisioning.exchange
+      exchangeType: topic
+      routingKey: provisioning.expire
+      exchangeDeclare:
+        durable: true
+        autoDelete: false
+      queueDeclare:
+        name: "provisioning.expire"
+        durable: true
+        autoDelete: false
+        exclusive: false
+      queueBind:
+        noWait: false
+      consume:
+        consumerTag: "argo-events-expire"
+        autoAck: false
+        exclusive: false
+      auth:
+        username:
+          name: rabbitmq-credentials
+          key: username
+        password:
+          name: rabbitmq-credentials
+          key: password
+---
+# Secret dans le meme namespace que l'EventSource
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-credentials
+  namespace: argo-events
+type: Opaque
+stringData:
+  username: "guest"
+  password: "guest"

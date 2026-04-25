@@ -25,7 +25,7 @@ public interface TenantRepository extends JpaRepository<Tenant, UUID> {
             LocalDateTime date
     );
 
-    List<Tenant> findByAccountTypeAndSuspendedTrueAndUpdatedAtBefore(
+    List<Tenant> findByAccountTypeAndSuspendedFalseAndDemoExpiresAtBefore(
             AccountType accountType,
             LocalDateTime date
     );

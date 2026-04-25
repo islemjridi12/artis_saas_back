@@ -19,6 +19,17 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8081
+
           envFrom:
             - configMapRef:
                 name: saas-platform-config
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "k8s"
+            - name: APP_PUBLIC_URL
+              value: "https://lyndsey-sawlike-bret.ngrok-free.dev"
+            - name: APP_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: internal-api-secret
+                  key: secret
