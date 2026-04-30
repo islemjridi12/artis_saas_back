@@ -16,6 +16,7 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3.12-management-alpine
+          command: ["sh", "-c", "rabbitmq-plugins enable rabbitmq_prometheus && rabbitmq-server"]
           env:
             - name: RABBITMQ_DEFAULT_USER
               value: guest
@@ -24,3 +25,4 @@ spec:
           ports:
             - containerPort: 5672
             - containerPort: 15672
+            - containerPort: 15692

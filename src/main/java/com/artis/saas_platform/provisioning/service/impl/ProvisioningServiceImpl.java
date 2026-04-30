@@ -105,7 +105,7 @@ public class ProvisioningServiceImpl implements ProvisioningService {
                 .emailVerified(false)
 
                 .otpToken(otpToken)
-
+                .accountType(AccountType.PROD)
                 .status(ProvisioningStatus.PENDING_EMAIL)
                 .attempts(0)
                 .createdAt(LocalDateTime.now())

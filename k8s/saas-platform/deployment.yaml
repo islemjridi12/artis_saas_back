@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: saas-platform
-          image: artis/saas-platform:latest
+          image: artis/saas-platform:v37
           imagePullPolicy: Never
           ports:
             - containerPort: 8081

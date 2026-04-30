@@ -1,0 +1,94 @@
+---
+# CronJob qui verifie les consumers RabbitMQ toutes les 2 minutes
+# et restart l'EventSource si l'un des 3 consumers est manquant.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: eventsource-healthcheck
+  namespace: argo-events
+  labels:
+    app: eventsource-healthcheck
+spec:
+  schedule: "*/2 * * * *"          # toutes les 2 minutes
+  concurrencyPolicy: Forbid         # pas de jobs concurrents
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 300  # supprime le pod 5 min apres
+      template:
+        metadata:
+          labels:
+            app: eventsource-healthcheck
+        spec:
+          serviceAccountName: eventsource-healthcheck-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: healthcheck
+              image: bitnami/kubectl:latest
+              env:
+                - name: EXPECTED_QUEUES
+                  value: "provisioning.create provisioning.migrate provisioning.expire"
+                - name: EVENTSOURCE_NAMESPACE
+                  value: "argo-events"
+                - name: EVENTSOURCE_LABEL
+                  value: "eventsource-name=provisioning-amqp"
+                - name: RABBITMQ_NAMESPACE
+                  value: "artis"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  echo "==========================================="
+                  echo "[HEALTHCHECK] EventSource AMQP consumer check"
+                  echo "[HEALTHCHECK] $(date)"
+                  echo "==========================================="
+
+                  # Recuperer le statut des queues depuis RabbitMQ
+                  echo "[HEALTHCHECK] Querying RabbitMQ..."
+                  QUEUES=$(kubectl exec -n $RABBITMQ_NAMESPACE deployment/rabbitmq -- \
+                    rabbitmqctl list_queues name consumers --quiet --no-table-headers 2>/dev/null \
+                    || echo "")
+
+                  if [ -z "$QUEUES" ]; then
+                    echo "[HEALTHCHECK] RabbitMQ unreachable, skipping check"
+                    exit 0
+                  fi
+
+                  echo "[HEALTHCHECK] Current state:"
+                  echo "$QUEUES"
+                  echo ""
+
+                  # Verifier chaque queue attendue
+                  MISSING=0
+                  for QUEUE in $EXPECTED_QUEUES; do
+                    LINE=$(echo "$QUEUES" | grep "^$QUEUE" || echo "")
+                    if [ -z "$LINE" ]; then
+                      echo "[HEALTHCHECK] WARNING: Queue '$QUEUE' not found"
+                      MISSING=$((MISSING + 1))
+                      continue
+                    fi
+
+                    CONSUMERS=$(echo "$LINE" | awk '{print $2}')
+                    if [ "$CONSUMERS" -lt 1 ]; then
+                      echo "[HEALTHCHECK] PROBLEM: Queue '$QUEUE' has 0 consumers"
+                      MISSING=$((MISSING + 1))
+                    else
+                      echo "[HEALTHCHECK] OK: Queue '$QUEUE' has $CONSUMERS consumer(s)"
+                    fi
+                  done
+
+                  echo ""
+                  if [ $MISSING -eq 0 ]; then
+                    echo "[HEALTHCHECK] All consumers healthy. Nothing to do."
+                    exit 0
+                  fi
+
+                  echo "[HEALTHCHECK] $MISSING consumer(s) missing. Restarting EventSource pod..."
+                  kubectl delete pod -n $EVENTSOURCE_NAMESPACE -l $EVENTSOURCE_LABEL
+
+                  echo "[HEALTHCHECK] EventSource pod restarted. Consumers will reattach in ~30s."
+                  echo "[HEALTHCHECK] Done."

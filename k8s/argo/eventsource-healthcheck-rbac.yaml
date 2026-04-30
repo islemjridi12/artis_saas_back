@@ -1,0 +1,72 @@
+---
+# ServiceAccount dans argo-events (où tourne le CronJob)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eventsource-healthcheck-sa
+  namespace: argo-events
+
+---
+# Role : pouvoir delete les pods de l'EventSource
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eventsource-healthcheck-role
+  namespace: argo-events
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+
+---
+# RoleBinding dans argo-events
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eventsource-healthcheck-rb
+  namespace: argo-events
+subjects:
+  - kind: ServiceAccount
+    name: eventsource-healthcheck-sa
+    namespace: argo-events
+roleRef:
+  kind: Role
+  name: eventsource-healthcheck-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Role dans namespace artis (pour exec sur RabbitMQ)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rabbitmq-reader-role
+  namespace: artis
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+
+---
+# RoleBinding cross-namespace : SA argo-events → Role artis
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eventsource-healthcheck-rabbitmq-rb
+  namespace: artis
+subjects:
+  - kind: ServiceAccount
+    name: eventsource-healthcheck-sa
+    namespace: argo-events
+roleRef:
+  kind: Role
+  name: rabbitmq-reader-role
+  apiGroup: rbac.authorization.k8s.io
