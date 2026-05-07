@@ -182,31 +182,31 @@ spec:
                   parameters:
                     - name: tenantDomain
                       value: "PLACEHOLDER"
-                    - name: prodSchemaName     # tenant_xxx (cible)
+                    - name: prodSchemaName
                       value: "PLACEHOLDER"
-                    - name: demoSchemaName     # demo_xxx (source)
+                    - name: demoSchemaName
                       value: "PLACEHOLDER"
-                    - name: databaseName        # artisdb (cible PROD)
+                    - name: databaseName
                       value: "PLACEHOLDER"
-                    - name: demoDatabaseName    # artisdb_demo (source)
+                    - name: demoDatabaseName
                       value: "PLACEHOLDER"
                     - name: devSchema
                       value: "PLACEHOLDER"
                     - name: requestId
                       value: "PLACEHOLDER"
-                    - name: withData            # "true" ou "false" (string)
+                    - name: withData
                       value: "false"
                 volumes:
                   - name: atlas-migrations
                     hostPath:
                       path: /mnt/atlas-migrations
                       type: Directory
+                  - name: migrate-sql
+                    configMap:
+                      name: migrate-tables-sql
+                      defaultMode: 0755
 
                 templates:
-                  # ─── Pipeline principal ───
-                  # Note : copy-data depend de withData.
-                  # Si withData=true : on copie les donnees demo -> prod
-                  # Si withData=false : on saute cette etape
                   - name: pipeline
                     steps:
                       - - name: create-prod-schema
@@ -223,7 +223,6 @@ spec:
                       - - name: notify
                           template: notify
 
-                  # ─── Step 1 : creer le schema PROD ───
                   - name: create-prod-schema
                     container:
                       image: postgres:15-alpine
@@ -233,7 +232,6 @@ spec:
                         - "-c"
                         - "CREATE SCHEMA IF NOT EXISTS {{workflow.parameters.prodSchemaName}};"
 
-                  # ─── Step 2 : schema dev jetable pour Atlas ───
                   - name: create-dev-schema
                     container:
                       image: postgres:15-alpine
@@ -243,7 +241,6 @@ spec:
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE; CREATE SCHEMA {{workflow.parameters.devSchema}};"
 
-                  # ─── Step 3 : Atlas cree les tables dans PROD ───
                   - name: atlas-schema
                     container:
                       image: arigaio/atlas:latest
@@ -263,69 +260,23 @@ spec:
                           mountPath: /migrations
                           readOnly: true
 
-                  # ─── Step 4 : copier les donnees demo -> prod (si withData=true) ───
-                  # Utilise dblink pour copier entre DIFFERENTES bases (artisdb_demo -> artisdb).
-                  # Lit dynamiquement toutes les tables via information_schema.
+                  # ─── Step 4 : Copy data via ConfigMap script ───
                   - name: copy-data
                     container:
                       image: postgres:15-alpine
-                      command: [sh, -c]
+                      command: [sh, /sql/copy-tables.sh]
+                      args:
+                        - "{{workflow.parameters.demoDatabaseName}}"
+                        - "{{workflow.parameters.databaseName}}"
+                        - "{{workflow.parameters.demoSchemaName}}"
+                        - "{{workflow.parameters.prodSchemaName}}"
                       env:
                         - name: PGPASSWORD
                           value: postgres
-                      args:
-                        - |
-                          set -e
-                          echo "[COPY] Starting data copy from {{workflow.parameters.demoSchemaName}} (db={{workflow.parameters.demoDatabaseName}}) to {{workflow.parameters.prodSchemaName}} (db={{workflow.parameters.databaseName}})"
+                      volumeMounts:
+                        - name: migrate-sql
+                          mountPath: /sql
 
-                          # Installer dblink dans la DB prod (si pas deja fait)
-                          psql -h postgresql.artis.svc.cluster.local -U postgres -d {{workflow.parameters.databaseName}} \
-                            -c "CREATE EXTENSION IF NOT EXISTS dblink;"
-
-                          # Boucler sur toutes les tables du schema source et copier
-                          psql -h postgresql.artis.svc.cluster.local -U postgres -d {{workflow.parameters.databaseName}} <<SQL
-                          DO \$\$
-                          DECLARE
-                              rec RECORD;
-                              cols TEXT;
-                              sql_stmt TEXT;
-                          BEGIN
-                              FOR rec IN
-                                  SELECT table_name
-                                  FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
-                                              'SELECT table_name FROM information_schema.tables WHERE table_schema = ''{{workflow.parameters.demoSchemaName}}'' AND table_type = ''BASE TABLE''')
-                                  AS t(table_name TEXT)
-                              LOOP
-                                  -- Recuperer les colonnes de la table (sauf les id IDENTITY)
-                                  SELECT string_agg(quote_ident(column_name), ', ')
-                                  INTO cols
-                                  FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
-                                              format('SELECT column_name FROM information_schema.columns WHERE table_schema = %L AND table_name = %L ORDER BY ordinal_position', '{{workflow.parameters.demoSchemaName}}', rec.table_name))
-                                  AS c(column_name TEXT);
-
-                                  -- INSERT ... SELECT via dblink
-                                  sql_stmt := format(
-                                      'INSERT INTO {{workflow.parameters.prodSchemaName}}.%I (%s) SELECT %s FROM dblink(%L, %L) AS src(%s)',
-                                      rec.table_name,
-                                      cols,
-                                      cols,
-                                      'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
-                                      format('SELECT %s FROM %I.%I', cols, '{{workflow.parameters.demoSchemaName}}', rec.table_name),
-                                      (SELECT string_agg(quote_ident(column_name) || ' ' || data_type, ', ')
-                                       FROM dblink('host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname={{workflow.parameters.demoDatabaseName}}',
-                                                   format('SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = %L AND table_name = %L ORDER BY ordinal_position', '{{workflow.parameters.demoSchemaName}}', rec.table_name))
-                                       AS c(column_name TEXT, data_type TEXT))
-                                  );
-
-                                  RAISE NOTICE 'Copying table: %', rec.table_name;
-                                  EXECUTE sql_stmt;
-                              END LOOP;
-                          END \$\$;
-                          SQL
-
-                          echo "[COPY] Data copy completed"
-
-                  # ─── Step 5 : DROP schema demo ───
                   - name: drop-demo-schema
                     container:
                       image: postgres:15-alpine
@@ -335,7 +286,6 @@ spec:
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.demoSchemaName}} CASCADE;"
 
-                  # ─── onExit : cleanup dev schema ───
                   - name: cleanup-dev-schema
                     container:
                       image: postgres:15-alpine
@@ -345,7 +295,6 @@ spec:
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE;"
 
-                  # ─── Step 6 : notify saas-platform ───
                   - name: notify
                     container:
                       image: curlimages/curl:latest
@@ -403,7 +352,7 @@ spec:
               operation: append
 
     # ═══════════════════════════════════════════════════════════════════════
-    # Trigger 3 : EXPIRE (30 jours apres suspension, nettoyage definitif)
+    # Trigger 3 : EXPIRE (30 jours apres suspension)
     # ═══════════════════════════════════════════════════════════════════════
     - template:
         name: expire-trigger

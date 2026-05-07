@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migrate-tables-sql
+  namespace: argo
+data:
+  copy-tables.sh: |
+    #!/bin/sh
+    set -e
+
+    DEMO_DB=$1
+    PROD_DB=$2
+    DEMO_SCHEMA=$3
+    PROD_SCHEMA=$4
+
+    echo "[COPY] Starting copy ${DEMO_SCHEMA} (db=${DEMO_DB}) -> ${PROD_SCHEMA} (db=${PROD_DB})"
+
+    psql -h postgresql.artis.svc.cluster.local -U postgres -d ${PROD_DB} \
+      -c "CREATE EXTENSION IF NOT EXISTS dblink;"
+
+    sed -e "s|@@DEMO_DB@@|${DEMO_DB}|g" \
+        -e "s|@@DEMO_SCHEMA@@|${DEMO_SCHEMA}|g" \
+        -e "s|@@PROD_SCHEMA@@|${PROD_SCHEMA}|g" \
+        /sql/copy-tables.sql > /tmp/copy-tables.sql
+
+    psql -h postgresql.artis.svc.cluster.local -U postgres -d ${PROD_DB} \
+      -f /tmp/copy-tables.sql
+
+    echo "[COPY] All tables copied successfully"
+
+  copy-tables.sql: |
+    -- ─── article_groupe ───
+    INSERT INTO @@PROD_SCHEMA@@.article_groupe
+      (id_groupe_article, code_groupe_article, libelle, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_groupe_article, code_groupe_article, libelle, created_at, updated_at FROM @@DEMO_SCHEMA@@.article_groupe'
+                  ) AS t(id_groupe_article bigint, code_groupe_article varchar, libelle varchar, created_at timestamp, updated_at timestamp);
+
+    -- ─── article_categorie ───
+    INSERT INTO @@PROD_SCHEMA@@.article_categorie
+      (id_categorie_article, code_categorie, libelle, fk_groupe_article, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_categorie_article, code_categorie, libelle, fk_groupe_article, created_at, updated_at FROM @@DEMO_SCHEMA@@.article_categorie'
+                  ) AS t(id_categorie_article bigint, code_categorie varchar, libelle varchar, fk_groupe_article bigint, created_at timestamp, updated_at timestamp);
+
+    -- ─── article_unite ───
+    INSERT INTO @@PROD_SCHEMA@@.article_unite
+      (id_unite, code_unite, libelle, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_unite, code_unite, libelle, created_at, updated_at FROM @@DEMO_SCHEMA@@.article_unite'
+                  ) AS t(id_unite bigint, code_unite varchar, libelle varchar, created_at timestamp, updated_at timestamp);
+
+    -- ─── article ───
+    INSERT INTO @@PROD_SCHEMA@@.article
+      (id_article, code_article, libelle, description, code_barre, prix_achat, prix_vente, tva, image_url, fk_categorie_article, fk_unite, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_article, code_article, libelle, description, code_barre, prix_achat, prix_vente, tva, image_url, fk_categorie_article, fk_unite, created_at, updated_at FROM @@DEMO_SCHEMA@@.article'
+                  ) AS t(id_article bigint, code_article varchar, libelle varchar, description text, code_barre varchar, prix_achat numeric, prix_vente numeric, tva numeric, image_url varchar, fk_categorie_article bigint, fk_unite bigint, created_at timestamp, updated_at timestamp);
+
+    -- ─── client ───
+    INSERT INTO @@PROD_SCHEMA@@.client
+      (id_client, nom, prenom, telephone, email, adresse, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_client, nom, prenom, telephone, email, adresse, created_at, updated_at FROM @@DEMO_SCHEMA@@.client'
+                  ) AS t(id_client bigint, nom varchar, prenom varchar, telephone varchar, email varchar, adresse text, created_at timestamp, updated_at timestamp);
+
+    -- ─── commande ───
+    INSERT INTO @@PROD_SCHEMA@@.commande
+      (id_commande, numero_commande, date_commande, fk_client, montant_total, created_at, updated_at)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_commande, numero_commande, date_commande, fk_client, montant_total, created_at, updated_at FROM @@DEMO_SCHEMA@@.commande'
+                  ) AS t(id_commande bigint, numero_commande varchar, date_commande date, fk_client bigint, montant_total numeric, created_at timestamp, updated_at timestamp);
+
+    -- ─── ligne_commande ───
+    INSERT INTO @@PROD_SCHEMA@@.ligne_commande
+      (id_ligne_commande, fk_commande, fk_article, quantite, prix_unitaire, montant_ligne)
+    SELECT * FROM dblink(
+                          'host=postgresql.artis.svc.cluster.local user=postgres password=postgres dbname=@@DEMO_DB@@',
+                          'SELECT id_ligne_commande, fk_commande, fk_article, quantite, prix_unitaire, montant_ligne FROM @@DEMO_SCHEMA@@.ligne_commande'
+                  ) AS t(id_ligne_commande bigint, fk_commande bigint, fk_article bigint, quantite numeric, prix_unitaire numeric, montant_ligne numeric);

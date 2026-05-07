@@ -25,8 +25,6 @@ public class EmailService {
     @Value("${app.frontend.url}")    // ← changer ici
     private String frontendUrl;       // ← renommer aussi
 
-    @Value("${app.metier.url}")
-    private String metierUrl;
 
     public void sendVerificationEmail(String to, String code) {
         String html = loadTemplate("otp-verification.html")
@@ -49,7 +47,8 @@ public class EmailService {
             String tenantDomain, String tempPassword) {
 
         // 🔥 Utiliser metierUrl au lieu de localhost
-        String loginUrl = metierUrl + "/signin";
+        String loginUrl = "http://" + tenantDomain + ".artis.com/signin";
+
 
         String passwordText = (tempPassword == null
                 || tempPassword.equals("**CLEARED**"))
@@ -80,7 +79,7 @@ public class EmailService {
     public void sendDemoExpiredEmail(String to, String orgName, String domain) {
 
         // 🔥 Utiliser platformUrl au lieu de localhost
-        String migrateUrl = frontendUrl + "/migrate"
+        String migrateUrl = "http://artis.com/migrate"
                 + "?domain=" + domain
                 + "&email=" + to;
 
@@ -107,7 +106,7 @@ public class EmailService {
             String tenantDomain, String tempPassword) {
 
         // 🔥 Utiliser metierUrl au lieu de localhost
-        String loginUrl = metierUrl + "/signin";
+        String loginUrl = "http://" + tenantDomain + ".artis.com/signin";
 
         String html = loadTemplate("demo-ready.html")
                 .replace("{{firstName}}",        firstName)

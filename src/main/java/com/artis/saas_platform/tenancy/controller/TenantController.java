@@ -49,6 +49,12 @@ public class TenantController {
         response.put("schema", schema);
         response.put("accountType", accountTypeName);
         response.put("database", database);
+        response.put("status", tenant.getStatus() != null ? tenant.getStatus().name() : "ACTIVE");
+        response.put("suspended", tenant.isSuspended());
+        response.put("organizationName", tenant.getOrganizationName());
+        response.put("adminEmail", tenant.getAdminEmail());
+        response.put("createdAt", tenant.getCreatedAt() != null ? tenant.getCreatedAt().toString() : null);
+        response.put("demoExpiresAt", tenant.getDemoExpiresAt() != null ? tenant.getDemoExpiresAt().toString() : null);
 
         return ResponseEntity.ok(response);
     }
