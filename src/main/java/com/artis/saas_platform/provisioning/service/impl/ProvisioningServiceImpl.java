@@ -232,6 +232,7 @@ public class ProvisioningServiceImpl implements ProvisioningService {
                 tenant.setDemoExpiresAt(null);
                 tenant.setUpdatedAt(LocalDateTime.now());
                 tenantRepository.save(tenant);
+                keycloakProvisioner.updateAccountTypeClaim(tenant.getRealm(), "PROD");
 
                 // 6. Desactiver subscription DEMO
                 subscriptionRepository

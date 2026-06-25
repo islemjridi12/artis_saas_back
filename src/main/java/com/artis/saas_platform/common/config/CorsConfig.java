@@ -10,14 +10,18 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(
-                        "http://localhost:4200",   // ARTIS Platform frontend
-                        "http://localhost:4201",   // ARTIS Métier frontend
-                        "http://localhost:55639",   // ARTIS Métier frontend (port dynamique)
-                        "http://localhost:8080"
+                .allowedOriginPatterns(
+                        "http://localhost:4200",
+                        "http://localhost:4201",
+                        "http://localhost:55639",
+                        "http://localhost:8080",
+                        "http://artis.com",
+                        "http://www.artis.com",
+                        "http://*.artis.com"      // ← tous les sous-domaines tenants
                 )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
-                .allowCredentials(true);
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }

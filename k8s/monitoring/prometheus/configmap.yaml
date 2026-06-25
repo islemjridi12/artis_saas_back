@@ -20,6 +20,15 @@ data:
             target_label: instance
             replacement: 'saas-platform'
 
+      - job_name: 'artis-metier'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['artis-metier-service.artis.svc.cluster.local:8082']
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: instance
+            replacement: 'artis-metier'
+
       - job_name: 'postgresql'
         static_configs:
           - targets: ['postgres-exporter.monitoring.svc.cluster.local:9187']
@@ -37,11 +46,9 @@ data:
             replacement: 'rabbitmq'
 
       - job_name: 'argo-server'
+        scheme: http
         static_configs:
           - targets: ['argo-server.argo.svc.cluster.local:2746']
-        tls_config:
-          insecure_skip_verify: true
-        scheme: https
         relabel_configs:
           - source_labels: [__address__]
             target_label: instance

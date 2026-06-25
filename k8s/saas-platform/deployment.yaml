@@ -3,15 +3,31 @@ kind: Deployment
 metadata:
   name: saas-platform
   namespace: artis
+  labels:
+    app: saas-platform
+    component: backend
 spec:
   replicas: 1
+
+  # ═══════════════════════════════════════════════════════
+  # Stratégie de déploiement : Rolling Update
+  # Garantit zéro downtime lors des mises à jour
+  # ═══════════════════════════════════════════════════════
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # 1 pod supplémentaire pendant l'upgrade
+      maxUnavailable: 0    # 0 pod indisponible (zero downtime)
+
   selector:
     matchLabels:
       app: saas-platform
+
   template:
     metadata:
       labels:
         app: saas-platform
+        component: backend
     spec:
       containers:
         - name: saas-platform
@@ -19,6 +35,7 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8081
+              name: http
 
           envFrom:
             - configMapRef:
@@ -33,3 +50,36 @@ spec:
                 secretKeyRef:
                   name: internal-api-secret
                   key: secret
+
+          # ═══════════════════════════════════════════════════════
+          # Health checks : garantissent qu'un pod est prêt
+          # avant d'être ajouté au service load balancer
+          # ═══════════════════════════════════════════════════════
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # ═══════════════════════════════════════════════════════
+          # Resource limits : éviter qu'un pod consomme tout
+          # ═══════════════════════════════════════════════════════
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
