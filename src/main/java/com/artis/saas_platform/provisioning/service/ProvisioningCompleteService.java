@@ -92,13 +92,10 @@ public class ProvisioningCompleteService {
         log.info("[COMPLETE] Tenant created → id={} domain={} schema={}",
                 tenant.getTenantId(), domain, tenant.getSchemaName());
 
-        // 2. Si PROD : Subscription
-        if (!isDemo) {
-            Subscription subscription = createSubscription(tenant, pr, now);
-            subscriptionRepo.save(subscription);
-            log.info("[COMPLETE] Subscription created → tenant={} plan={}",
-                    domain, pr.getPlan());
-        }
+        // 2. Creer la Subscription prod ou demo
+        Subscription subscription = createSubscription(tenant, pr, now);
+        subscriptionRepo.save(subscription);
+        log.info("[COMPLETE] Subscription created → tenant={} plan={} isDemo={}", domain, pr.getPlan(), isDemo);
 
         // 3. Keycloak
         provisionKeycloak(pr, tenant);
@@ -156,19 +153,40 @@ public class ProvisioningCompleteService {
         tenant.setStatus(TenantStatus.ACTIVE);
         tenant.setSuspended(false);
         tenant.setDemoExpiresAt(null);       // plus de date d'expiration
+        tenant.setSuspendedAt(null);        // ← ajoute cette ligne
         tenant.setPlan(pr.getPlan());
         tenant.setUpdatedAt(now);
         tenant = tenantRepo.save(tenant);
 
         // 3. Creer la Subscription PROD
+        //il faut annuler la subscription DEMO existante avant de creer la nouvelle subscription PROD
+        subscriptionRepo.findByTenantAndStatus(tenant, SubscriptionStatus.ACTIVE)
+                .ifPresent(sub -> {
+                    sub.setStatus(SubscriptionStatus.CANCELLED);
+                    subscriptionRepo.save(sub);
+                    log.info("[MIGRATE] DEMO subscription cancelled → tenant={}", domain);
+                });
         Subscription subscription = createSubscription(tenant, pr, now);
         subscriptionRepo.save(subscription);
         log.info("[MIGRATE] Subscription created → tenant={} plan={}",
                 domain, pr.getPlan());
 
-        // 4. Pas de modification Keycloak : le realm existe deja et on garde
-        //    le meme user/password
 
+        // 4. Reactiver les users Keycloak ← AJOUTE
+        try {
+            keycloakProvisioner.enableAllUsersInRealm(tenant.getRealm());
+            log.info("[MIGRATE] Keycloak users enabled → realm={}", tenant.getRealm());
+        } catch (Exception e) {
+            log.error("[MIGRATE] Failed to enable Keycloak users → realm={} error={}",
+                    domain, e.getMessage());
+        }
+        //Mettre a jour accountType claim PROD
+        try {
+            keycloakProvisioner.updateAccountTypeClaim(tenant.getRealm(), "PROD");
+            log.info("[MIGRATE] accountType claim updated → realm={}", tenant.getRealm());
+        } catch (Exception e) {
+            log.error("[MIGRATE] Failed to update accountType claim → realm={}", domain);
+        }
         // 5. Update ProvisioningRequest
         pr.setStatus(ProvisioningStatus.COMPLETED);
         pr.setTenantId(tenant.getTenantId());

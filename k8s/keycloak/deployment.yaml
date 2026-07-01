@@ -18,19 +18,29 @@ spec:
           image: quay.io/keycloak/keycloak:26.0
           args: ["start-dev"]
           env:
-            # ─── Nouveaux noms de variables en Keycloak 26 ───
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: keycloak-admin-username
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD
-              value: admin
-            # ─── DB config ───
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: keycloak-admin-password
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
               value: jdbc:postgresql://postgresql:5432/keycloak
             - name: KC_DB_USERNAME
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: postgres-user
             - name: KC_DB_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: postgres-password
           ports:
             - containerPort: 8080

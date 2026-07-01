@@ -107,6 +107,6 @@ metadata:
   name: rabbitmq-credentials
   namespace: argo-events
 type: Opaque
-stringData:
-  username: "guest"
-  password: "guest"
+data:
+  username: Z3Vlc3Q=
+  password: Z3Vlc3Q=

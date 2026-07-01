@@ -31,3 +31,20 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Secrets & credentials
+application-prod.properties
+application-dev.properties
+application-test.properties
+application.properties
+secrets.yaml
+*.env
+.env*
+Ajoute au .gitignore :
+**/rabbitmq-credentials.yaml
+**/secrets.yaml
+*secret*.yaml
+
+# Ne jamais committer les properties avec vrais mots de passe
+**/application-prod.properties
+**/application-dev.properties

@@ -41,6 +41,7 @@ public class ProvisioningScheduler {
                         pr.isMigrationPending());
 
                 // ─── Branche selon le contexte ───
+                //is migration pending? → publish migrate event
                 if (pr.isMigrationPending()) {
                     publisher.publishMigrate(pr);
                 } else {

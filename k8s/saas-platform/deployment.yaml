@@ -8,21 +8,14 @@ metadata:
     component: backend
 spec:
   replicas: 1
-
-  # ═══════════════════════════════════════════════════════
-  # Stratégie de déploiement : Rolling Update
-  # Garantit zéro downtime lors des mises à jour
-  # ═══════════════════════════════════════════════════════
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1          # 1 pod supplémentaire pendant l'upgrade
-      maxUnavailable: 0    # 0 pod indisponible (zero downtime)
-
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: saas-platform
-
   template:
     metadata:
       labels:
@@ -31,12 +24,11 @@ spec:
     spec:
       containers:
         - name: saas-platform
-          image: artis/saas-platform:v37
+          image: artis/saas-platform:v39
           imagePullPolicy: Never
           ports:
             - containerPort: 8081
               name: http
-
           envFrom:
             - configMapRef:
                 name: saas-platform-config
@@ -50,36 +42,63 @@ spec:
                 secretKeyRef:
                   name: internal-api-secret
                   key: secret
+            - name: SPRING_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: mail-password
+            - name: PAYMEE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: paymee-api-token
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: keycloak-admin-password
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: postgres-password
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: rabbitmq-password
 
-          # ═══════════════════════════════════════════════════════
-          # Health checks : garantissent qu'un pod est prêt
-          # avant d'être ajouté au service load balancer
-          # ═══════════════════════════════════════════════════════
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8081
-            initialDelaySeconds: 60
+            initialDelaySeconds: 0
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 3
 
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 0
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 10
             failureThreshold: 3
 
-          # ═══════════════════════════════════════════════════════
-          # Resource limits : éviter qu'un pod consomme tout
-          # ═══════════════════════════════════════════════════════
           resources:
             requests:
               memory: "512Mi"
               cpu: "250m"
             limits:
-              memory: "1Gi"
-              cpu: "500m"
+              memory: "1.5Gi"
+              cpu: "1000m"

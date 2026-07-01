@@ -73,8 +73,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "CREATE SCHEMA IF NOT EXISTS {{workflow.parameters.schemaName}};"
 
@@ -82,8 +88,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE; CREATE SCHEMA {{workflow.parameters.devSchema}};"
 
@@ -91,13 +103,19 @@ spec:
                     container:
                       image: arigaio/atlas:latest
                       command: ["/atlas"]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
                         - schema
                         - apply
                         - --url
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.schemaName}}&sslmode=disable"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.schemaName}}&sslmode=disable"
                         - --dev-url
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
                         - --to
                         - "file:///migrations/schema.sql"
                         - --auto-approve
@@ -110,8 +128,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE;"
 
@@ -227,8 +251,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "CREATE SCHEMA IF NOT EXISTS {{workflow.parameters.prodSchemaName}};"
 
@@ -236,8 +266,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE; CREATE SCHEMA {{workflow.parameters.devSchema}};"
 
@@ -245,13 +281,19 @@ spec:
                     container:
                       image: arigaio/atlas:latest
                       command: ["/atlas"]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
                         - schema
                         - apply
                         - --url
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.prodSchemaName}}&sslmode=disable"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.prodSchemaName}}&sslmode=disable"
                         - --dev-url
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
                         - --to
                         - "file:///migrations/schema.sql"
                         - --auto-approve
@@ -272,7 +314,10 @@ spec:
                         - "{{workflow.parameters.prodSchemaName}}"
                       env:
                         - name: PGPASSWORD
-                          value: postgres
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       volumeMounts:
                         - name: migrate-sql
                           mountPath: /sql
@@ -281,8 +326,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.demoDatabaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.demoDatabaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.demoSchemaName}} CASCADE;"
 
@@ -290,8 +341,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.devSchema}} CASCADE;"
 
@@ -386,8 +443,14 @@ spec:
                     container:
                       image: postgres:15-alpine
                       command: [psql]
+                      env:
+                        - name: PGPASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: artis-secrets
+                              key: postgres-password
                       args:
-                        - "postgres://postgres:postgres@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
+                        - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}"
                         - "-c"
                         - "DROP SCHEMA IF EXISTS {{workflow.parameters.schemaName}} CASCADE;"
           parameters:

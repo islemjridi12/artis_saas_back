@@ -1,6 +1,7 @@
 package com.artis.saas_platform.provisioning.scheduler;
 
 import com.artis.saas_platform.common.Email.EmailService;
+import com.artis.saas_platform.keycloak.service.KeycloakProvisioner;
 import com.artis.saas_platform.provisioning.entity.AccountType;
 import com.artis.saas_platform.tenancy.entity.Tenant;
 import com.artis.saas_platform.tenancy.repository.TenantRepository;
@@ -39,6 +40,7 @@ public class DemoExpirationScheduler {
 
     private final TenantRepository tenantRepository;
     private final EmailService emailService;
+    private final KeycloakProvisioner keycloakProvisioner; // ← AJOUTE
 
     @Scheduled(fixedDelay = 60000)
     @Transactional
@@ -84,10 +86,18 @@ public class DemoExpirationScheduler {
         tenant.setSuspended(true);
         tenant.setSuspendedAt(LocalDateTime.now()); // ✅ CRITIQUE
         tenant.setUpdatedAt(LocalDateTime.now());
-
         tenantRepository.save(tenant);
 
-        // 2. Envoyer email d'expiration (avec lien upgrade)
+        // 2. Desactiver les users Keycloak ← AJOUTE
+        try {
+            keycloakProvisioner.disableAllUsersInRealm(tenant.getRealm());
+            log.info("[EXPIRATION] Keycloak users disabled → realm={}", tenant.getRealm());
+        } catch (Exception e) {
+            log.error("[EXPIRATION] Failed to disable Keycloak users → realm={} error={}",
+                    domain, e.getMessage());
+        }
+
+        // 3. Email d'expiration
         try {
             emailService.sendDemoExpiredEmail(
                     tenant.getAdminEmail(),
@@ -99,7 +109,7 @@ public class DemoExpirationScheduler {
                     domain, e.getMessage(), e);
         }
 
-        log.info("[EXPIRATION] ✔ Tenant suspended → domain={} email={}",
+        log.info("[EXPIRATION] Tenant suspended → domain={} email={}",
                 domain, tenant.getAdminEmail());
     }
 }

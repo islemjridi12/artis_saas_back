@@ -459,4 +459,49 @@ public class KeycloakProvisioner {
                     realm, e.getMessage());
         }
     }
+
+    public void disableAllUsersInRealm(String realm) {
+        try {
+            var users = keycloak.realm(realm).users().list();
+            if (users == null || users.isEmpty()) return;
+
+            for (var user : users) {
+                user.setEnabled(false);
+                keycloak.realm(realm).users().get(user.getId()).update(user);
+                log.info("[KEYCLOAK] User disabled → {} realm={}", user.getEmail(), realm);
+            }
+        } catch (Exception e) {
+            log.error("[KEYCLOAK] disableAllUsersInRealm failed → realm={} error={}",
+                    realm, e.getMessage());
+        }
+    }
+
+    public void enableAllUsersInRealm(String realm) {
+        try {
+            var users = keycloak.realm(realm).users().list();
+            if (users == null || users.isEmpty()) return;
+
+            for (var user : users) {
+                user.setEnabled(true);
+                keycloak.realm(realm).users().get(user.getId()).update(user);
+                log.info("[KEYCLOAK] User enabled → {} realm={}", user.getEmail(), realm);
+            }
+        } catch (Exception e) {
+            log.error("[KEYCLOAK] enableAllUsersInRealm failed → realm={} error={}",
+                    realm, e.getMessage());
+        }
+    }
+
+    public void deleteRealm(String realm) {
+        try {
+            if (realmExists(realm)) {
+                keycloak.realm(realm).remove();
+                log.info("[KEYCLOAK] Realm deleted → {}", realm);
+            } else {
+                log.warn("[KEYCLOAK] Realm not found, skip delete → {}", realm);
+            }
+        } catch (Exception e) {
+            log.error("[KEYCLOAK] deleteRealm failed → realm={} error={}", realm, e.getMessage());
+        }
+    }
 }

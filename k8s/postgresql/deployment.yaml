@@ -18,9 +18,15 @@ spec:
           image: postgres:15-alpine
           env:
             - name: POSTGRES_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: postgres-password
             - name: POSTGRES_USER
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: artis-secrets
+                  key: postgres-user
           ports:
             - containerPort: 5432
           volumeMounts:

@@ -88,7 +88,7 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
             ));
         }
 
-        // 🔥 ICI peut lancer l’exception
+        //  ICI peut lancer l’exception
         ProvisioningRequest pr = provisioningService.createInitialRequest(req);
 
         return ResponseEntity.ok(Map.of(
@@ -132,7 +132,7 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
             return ResponseEntity.ok("Payment failed");
         }
 
-        // ✅ récupérer le provisioningRequest
+        // récupérer le provisioningRequest
         ProvisioningRequest pr = provisioningService.markPaymentSuccess(token);
 
         return ResponseEntity.ok("OK");
@@ -155,7 +155,7 @@ public ResponseEntity<?> init(@Valid @RequestBody PaymentInitRequest req) {
         response.sendRedirect(frontendUrl + "/payment/success");
     }
 
-    // 🔥 MODIFIER redirectCancel
+    //  MODIFIER redirectCancel
     @GetMapping("/redirect-cancel")
     public void redirectCancel(HttpServletResponse response) throws IOException {
         response.sendRedirect(frontendUrl + "/payment/cancel");

@@ -4,5 +4,6 @@ public enum TenantStatus {
     PENDING,
     ACTIVE,
     ERROR,
-    SUSPENDED
+    SUSPENDED,
+    DELETED
 }

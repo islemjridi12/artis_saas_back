@@ -74,7 +74,7 @@ public class ProvisioningServiceImpl implements ProvisioningService {
 
             repository.save(existing);
 
-            // 🔥 renvoyer email
+            //  renvoyer email
             emailService.sendVerificationEmail(existing.getAdminEmail(), code);
 
             return existing;
@@ -114,7 +114,7 @@ public class ProvisioningServiceImpl implements ProvisioningService {
 
         pr = repository.save(pr);
 
-        // 🔥 envoi email
+        //  envoi email
         emailService.sendVerificationEmail(email, code);
 
         return pr;
