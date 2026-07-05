@@ -56,6 +56,15 @@ spec:
                     hostPath:
                       path: /mnt/atlas-migrations
                       type: Directory
+                # Version cible à tester plus tard : même principe que migrate-sql.
+                # Objectif : remplacer le hostPath par un ConfigMap Kubernetes nommé atlas-schema.
+                # Ce ConfigMap contiendra le fichier schema.sql utilisé par Atlas.
+                #
+                # À activer plus tard en remplaçant le bloc hostPath ci-dessus par :
+                #
+                # - name: atlas-migrations
+                #   configMap:
+                #     name: atlas-schema
 
                 templates:
                   - name: pipeline
@@ -117,6 +126,10 @@ spec:
                         - --dev-url
                         - "postgres://postgres:$(PGPASSWORD)@postgresql.artis.svc.cluster.local:5432/{{workflow.parameters.databaseName}}?search_path={{workflow.parameters.devSchema}}&sslmode=disable"
                         - --to
+                          # Atlas applique le schéma SQL disponible dans le conteneur.
+                          # Le fichier schema.sql est fourni par le volume atlas-migrations :
+                          # - actuellement via hostPath /mnt/atlas-migrations
+                          # - plus tard via ConfigMap atlas-schema
                         - "file:///migrations/schema.sql"
                         - --auto-approve
                       volumeMounts:
